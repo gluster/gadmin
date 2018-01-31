@@ -1,11 +1,11 @@
-# gadmin - Gluster's storage admin
+# gadmin - the Gluster CLI experience
 
 
 ## Why?
 
 #### History
 
-Gluster project has relied a lot on ‘glusterd’, its config management tool for anything to do with gluster filesystem, its deployment, its expansion, shrinking, and also extended it to provide more status etc. In other words, glusterd tool was Gluster project’s Day 1, Day 2 and Day 3.
+Through the recent releases of Gluster, glusterd has been the preferred method to accomplish Day1 and Day2 operations as well as publish data sets about Day3. However, glusterd was designed to be the config management layer to complete transactions in the gluster filesystem, expand and shrink operations and such.
 
 With project expanding, and as other tools emerged to do the config management better, there were many projects to just deal with Gluster’s Day 1 (eg., gdeploy), Gluster’s Day 3 (eg, gstatus, gluster-prometheus plugin etc etc).
 
