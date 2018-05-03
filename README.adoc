@@ -45,50 +45,21 @@ administration.
 
 == What?
 
-"`gadmin` has been conceptualised with a unified tool that enables a Storage
+*`gadmin` has been conceptualised as a unified CLI tool that enables a Storage
 Administrator to work with a Gluster based storage infrastructure. The focus is
 on enabling end-to-end management experience for a Gluster based storage
 infrastructure, without the need to delve into Gluster specific implmentation
-details."
+details.*
 
 The tool is aimed as part of the implementation of a Gluster Management CLI
 experience that must be uniform across deployment platforms, infrastructures
 and scenarios. In some cases some details of the experience may differ to
 accommodate the specifics of a platform or a scenario. However, it is key to
 ensure that the administrator does not need to change the thought process
-behind how Gluster infrastructure is managed.
-
-
-=== Day 1
-
-All users will have is a bunch of machines. A storage management tool should be
-able to setup the infra needed to get the gluster filesystem, setup the
-cluster, create the storage volumes as needed by the user. User may just know
-the required Storage capacity and high availability guarantee, or (s)he may
-know just the use-case. The tool should be able to make the right judgement
-based on the available information and provide a storage volume to user to
-consume.
-
-It should handle the integrations with access protocols like NFS-ganesha, SMB
-etc. Also manage the Block Storage, or Object storage interfaces if user asks
-for it.
-
-=== Day 2
-
-Able to manage snapshot, backup strategy, expand volume, (or shrink it),
-replace hardware, upgrade the software, etc etc.. Each of this may or may not
-involve data migration, idea is, end user need not be aware of this.
-
-Tuning the parameters of the volume also is part of the Day 2 operations.  All
-of the above should happen regardless of the access type (ie, file, block,
-object).
-
-=== Day 3
-
-Monitoring and debugging.  Also involves log management, stats collection, AI
-on collected data etc.
-
-
+behind how Gluster infrastructure is managed. The project will be developed and
+will work in conjunction with the
+https://github.com/gluster/gluster-ansible[gluster-ansible] project, which
+automates the administration tasks required to setup Gluster infrastructure.
 
 
 == How?
