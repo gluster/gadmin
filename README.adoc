@@ -70,9 +70,19 @@ automates the administration tasks required to setup Gluster infrastructure.
 * Gadmin has a scripting mode which can be used to execute one-off workflows
   to enable to be used in a programmable manner.
 * Gadmin is a higher level tool that is concerned with the Gluster deployment
-  as a whole. As such, it natively supports SMB, NFS etc. deployments and
-  includes the relevant information about these components in conjunction with
-  native GlusterFS information wherever applicable.
+  as a whole. As such, it natively supports Samba, NFS-Ganesha etc. deployments
+  and includes the relevant information about these components in conjunction
+  with native GlusterFS information wherever applicable.
+* Gadmin supports deployment of `glusterd2` based GlusterFS cluster and various
+  supporting components such as Samba and NFS-Ganesha on different platforms,
+  including various pre-baked scenarios (Day 1).
+* Gadmin presents workflows that enable day-to-day administration of a Gluster
+  deployment (Day 2).
+* Gadmin supports monitoring the status of a Gluster deployment. However, this
+  is on-demand, rather than perpetual. Gadmin is a CLI tool that is stateless
+  and agent-less. It cannot function as a full-time monitoring and metrics
+  stack. However, it may be possible to include some limited continuous
+  monitoring functionality such as that provided by tools like `top`.
 
 
 == How?
