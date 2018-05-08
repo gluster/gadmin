@@ -45,7 +45,7 @@ administration.
 
 == What?
 
-*`gadmin` has been conceptualised as a unified CLI tool that enables a Storage
+*Gadmin has been conceptualised as a unified CLI tool that enables a Storage
 Administrator to work with a Gluster based storage infrastructure. The focus is
 on enabling end-to-end management experience for a Gluster based storage
 infrastructure, without the need to delve into Gluster specific implmentation
@@ -61,7 +61,44 @@ will work in conjunction with the
 https://github.com/gluster/gluster-ansible[gluster-ansible] project, which
 automates the administration tasks required to setup Gluster infrastructure.
 
+=== Features
+
+* Gadmin is a portable and lightweight CLI tool whose dependencies are kept
+  at a minimum. `gluster-ansible` and its various roles are the primary
+  dependencies that Gadmin needs installed and invokable on the same system.
+* Gadmin presents a `virsh` like shell session to the user.
+* Gadmin has a scripting mode which can be used to execute one-off workflows
+  to enable to be used in a programmable manner.
+* Gadmin is a higher level tool that is concerned with the Gluster deployment
+  as a whole. As such, it natively supports SMB, NFS etc. deployments and
+  includes the relevant information about these components in conjunction with
+  native GlusterFS information wherever applicable.
+
 
 == How?
 
-**TODO:** This will be defined soon :-) Keep watching.
+* Gadmin is stateless towards Gluster. This means that each time the status
+  of a Gluster component is required, Gadmin makes an appropriate request for
+  it. Gadmin does not store the state of the infrastructure anywhere.
+* Gadmin is directly coupled with `gluster-ansible`. Much of Gadmin's
+  functionality requires `gluster-ansible`. However, the opposite is not true.
+  `gluster-ansible` must be able to function irrespective of
+  whether Gadmin is available or being used.
+* Gadmin supports both synchronous ('requests') and asynchronous ('jobs') tasks.
+* Requests are tasks that comprise of a single action (an API call eg.).
+* Requests are point-in-time and their output is only for display purposes.
+* Gadmin supports multi-step tasks. These are executed as jobs in a background
+  process.
+* Steps can be invocations of `gluster-ansible` playbooks.
+* `gluster-ansible` invocation is always a job.
+* Gadmin creates a directory structure per job into which all of the job's
+  output is written.
+* Gadmin executes `gluster-ansible` such that it writes its own output to disk,
+  in a format Gadmin can understand, in the job's directory structure.
+* Gadmin does not try to monitor the stdout or stderr streams of a step being
+  executed. Instead, it reads the output files created by the steps. This
+  ensures that even if Gadmin itself dies, the step being executed can
+  continue.
+* Every executed job and each step of the job has the full context in which to
+  carry out its operation.
+
