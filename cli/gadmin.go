@@ -27,33 +27,25 @@ func init() {
 		os.Exit(254)
 	}
 
-	// If $GADMIN_HOME isn't an absolute path, turn it into to ensure that no
-	// matter where we're run from, we always write to the same directory.
+	// If $GADMIN_HOME must be an absolute path.
+	// Ref: https://github.com/gluster/gadmin/issues/6#issuecomment-399989073
 	if !filepath.IsAbs(gadminHome) {
-		fmt.Printf("$GADMIN_HOME is not an absolute path; ")
-		// Not sure what filepath.Abs returns the error for, but since it does, we
-		// use it.
-		var err error
-		if gadminHome, err = filepath.Abs(gadminHome); err != nil {
-			fmt.Printf("error deriving absolute path: %v", err)
-			os.Exit(254)
-		}
-
-		fmt.Printf("using %q.\n", gadminHome)
+		fmt.Println("$GADMIN_HOME is not an absolute path; exiting.")
+		os.Exit(254)
 	}
 
 	// The directory needs to exist, be a directory and be writable.
 	switch exists, err := afero.DirExists(new(afero.OsFs), gadminHome); {
 	case !exists:
-		fmt.Printf("%q doesn't exist or is not a directory.\n", gadminHome)
+		fmt.Printf("$GADMIN_PATH %q doesn't exist or is not a directory.\n", gadminHome)
 		os.Exit(254)
 	case err != nil:
-		fmt.Printf("Error while checking for directory %q: %v", gadminHome, err)
+		fmt.Printf("Error while checking for $GADMIN_PATH %q: %v", gadminHome, err)
 		os.Exit(254)
 	}
 
 	if unix.Access(gadminHome, unix.W_OK) != nil {
-		fmt.Printf("%q is not writable; exiting.\n", gadminHome)
+		fmt.Printf("$GADMIN_PATH %q is not writable; exiting.\n", gadminHome)
 		os.Exit(254)
 	}
 
