@@ -5,11 +5,12 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gluster/gadmin"
 	"github.com/spf13/afero"
 	"golang.org/x/sys/unix"
 )
 
-var GadminHome *afero.BasePathFs // All the runtime files; except logs; will be written here.
+var Gadmin *gadmin.Gadmin
 
 // Startup checks
 func init() {
@@ -49,18 +50,13 @@ func init() {
 		os.Exit(254)
 	}
 
-	// Here's why we use afero. All operations will be restricted to this
-	// directory hereonwards.
-	GadminHome = afero.NewBasePathFs(afero.NewOsFs(), gadminHome).(*afero.BasePathFs)
-	// So RealPath() returns an error if the directory is outside the base path.
-	if path, err := GadminHome.RealPath("/"); err != nil {
-		fmt.Printf("Error: %q.\nThis is a bug.\n", err)
-		os.Exit(254)
-	} else {
-		fmt.Printf("Using %q as the work directory.\n", path)
+	var err error
+	if Gadmin, err = gadmin.New(gadminHome); err != nil {
+		fmt.Printf("Error while initialising gadmin: %v", err)
+		os.Exit(253)
 	}
 }
 
 func main() {
-	fmt.Println("gadmin")
+	fmt.Printf("%s", Gadmin)
 }
