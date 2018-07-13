@@ -18,13 +18,43 @@ type Inventory struct {
 	ClusterNames []string
 }
 
-type Cluster struct {
-	GlusterHosts *[]Host
+type InventoryCluster struct {
+	name      string
+	inventory *YamlInventory
 }
 
-type Host struct {
-	Name string
-	Vars map[string]string
+// Ansible YAML inventory structure
+// Ex.
+// all:
+//   hosts:
+//     192.168.100.71:
+//       var1: foo
+//     192.168.100.72:
+//       var1: foo
+//       var2: bar
+//     192.168.100.73:
+//   children:
+//     gluster:
+//       hosts:
+//         192.168.100.71:
+//         192.168.100.72:
+//         192.168.100.73:
+
+type InventoryHosts map[string]map[string]string // "hostname":{"var1":"val"}
+
+type YamlHosts struct { // hosts:{"hostname":{"var1":"val"}}
+	Hosts InventoryHosts `yaml:"hosts"`
+}
+
+type YamlHostGroup map[string]YamlHosts // "gluster":{hosts:{"hostname":{}}}
+
+type YamlAll struct { // hosts:{"hostname":{"var1":"val"}},children:{"gluster":{hosts:{"hostname":{}}}}
+	Hosts  InventoryHosts `yaml:"hosts"`
+	Groups YamlHostGroup  `yaml:"children"`
+}
+
+type YamlInventory struct { // all:hosts:{"hostname":{"var1":"val"}},children:{"gluster":{"hostname":{}}}
+	All YamlAll
 }
 
 func New(path string) (*Inventory, error) {
