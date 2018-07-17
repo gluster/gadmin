@@ -103,8 +103,27 @@ func (inv Inventory) String() string {
 	return fmt.Sprintf("Inventory at %q has %d clusters defined.\n", inv.Dir, len(inv.clusterNames))
 }
 
-// func (inv *Inventory) LoadCluster(name string) (Cluster, error) {
-// }
+func (inv *Inventory) LoadCluster(name string) (Cluster, error) {
+	if !inv.ContainsCluster(name) {
+		return Cluster{}, errors.New(fmt.Sprintf("Cluster named %q isn't in the inventory.", name))
+	}
+
+	var yamlData []byte
+	var err error
+
+	if yamlData, err = inv.readInventoryFile(name); err != nil {
+		return Cluster{}, errors.New(fmt.Sprintf("Unable load inventory file for cluster %q: %s\n", name, err))
+	}
+
+	clusterInv := &ClusterInventory{}
+	if err = clusterInv.fromYaml(yamlData); err != nil {
+		return Cluster{}, errors.New(fmt.Sprintf("Unable to load cluster from inventory %q: %s\n", name, err))
+	}
+
+	inv.addClusterName(name)
+
+	return Cluster{name, clusterInv}, nil
+}
 
 func (inv *Inventory) NewCluster(name string, glusterHosts []string) (Cluster, error) {
 	if inv.ContainsCluster(name) {
@@ -118,7 +137,7 @@ func (inv *Inventory) NewCluster(name string, glusterHosts []string) (Cluster, e
 	}
 
 	// Write the YAML inventory file
-	if err := inv.writeYamlFile(name, yamlFile); err != nil {
+	if err := inv.writeInventoryFile(name, yamlFile); err != nil {
 		return Cluster{}, errors.New(fmt.Sprintf("Unable to write YAML inventory: %s\n", err))
 	}
 
@@ -140,10 +159,16 @@ func (inv *Inventory) ContainsCluster(name string) bool {
 	return false
 }
 
-func (inv *Inventory) writeYamlFile(name string, data []byte) error {
-	path := inventoryDir + fmt.Sprintf("/%s.yml", name)
+func (inv *Inventory) readInventoryFile(name string) ([]byte, error) {
+	relPath := inventoryFileRelPath(name)
 	afs := &afero.Afero{Fs: inv.fs}
-	return afs.WriteFile(path, data, 0644)
+	return afs.ReadFile(relPath)
+}
+
+func (inv *Inventory) writeInventoryFile(name string, data []byte) error {
+	relPath := inventoryFileRelPath(name)
+	afs := &afero.Afero{Fs: inv.fs}
+	return afs.WriteFile(relPath, data, 0644)
 }
 
 func NewClusterInventory(name string, glusterHosts []string) *ClusterInventory {
@@ -165,4 +190,15 @@ func (inv *ClusterInventory) toYaml() ([]byte, error) {
 	}
 
 	return yamlOut, err
+}
+
+func (inv *ClusterInventory) fromYaml(yamlData []byte) error {
+	if err := yaml.Unmarshal(yamlData, inv); err != nil {
+		return err
+	}
+	return nil
+}
+
+func inventoryFileRelPath(name string) string {
+	return inventoryDir + fmt.Sprintf("%s.yml", name)
 }
