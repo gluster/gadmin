@@ -112,13 +112,13 @@ func (inv *Inventory) NewCluster(name string, glusterHosts []string) (Cluster, e
 	}
 
 	clusterInv := NewClusterInventory(name, glusterHosts)
-	yaml, err := clusterInv.toYaml()
+	yamlFile, err := clusterInv.toYaml()
 	if err != nil {
 		return Cluster{}, err
 	}
 
 	// Write the YAML inventory file
-	if err := inv.writeYamlFile(name, yaml); err != nil {
+	if err := inv.writeYamlFile(name, yamlFile); err != nil {
 		return Cluster{}, errors.New(fmt.Sprintf("Unable to write YAML inventory: %s\n", err))
 	}
 
@@ -159,10 +159,10 @@ func NewClusterInventory(name string, glusterHosts []string) *ClusterInventory {
 }
 
 func (inv *ClusterInventory) toYaml() ([]byte, error) {
-	yaml, err := yaml.Marshal(inv)
+	yamlOut, err := yaml.Marshal(inv)
 	if err != nil {
-		return yaml, errors.New(fmt.Sprintf("Unable to generate YAML inventory: %s\n", err))
+		return yamlOut, errors.New(fmt.Sprintf("Unable to generate YAML inventory: %s\n", err))
 	}
 
-	return yaml, err
+	return yamlOut, err
 }
