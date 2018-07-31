@@ -3,11 +3,13 @@ package inventory
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/afero"
+	"golang.org/x/sys/unix"
 	"gopkg.in/yaml.v2"
 )
 
@@ -21,7 +23,7 @@ type Inventory struct {
 
 type Cluster struct {
 	Name      string
-	inventory *ClusterInventory
+	Inventory *ClusterInventory
 }
 
 // Ansible YAML inventory structure
@@ -59,6 +61,8 @@ type ClusterInventory struct { // all:hosts:{"hostname":{"var1":"val"}},children
 }
 
 func New(path string) (*Inventory, error) {
+	path = filepath.Clean(path)
+
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return &Inventory{}, err
@@ -183,6 +187,74 @@ func NewClusterInventory(name string, glusterHosts []string) *ClusterInventory {
 	return &ClusterInventory{YamlAll{hosts, group}}
 }
 
+func (inv *ClusterInventory) GroupNames() []string {
+	names := make([]string, len(inv.All.Groups)+1)
+	names[0] = `all`
+	i := 1
+	for group := range inv.All.Groups {
+		names[i] = group
+	}
+
+	return names
+}
+
+func (inv *ClusterInventory) HasGroup(group string) bool {
+	_, found := inv.All.Groups[group]
+	return found
+}
+
+func (inv *ClusterInventory) HostsInGroups(groups []string) map[string][]string {
+	hosts := make(map[string][]string)
+
+	// Go over each group
+	for _, group := range groups {
+		switch {
+		case group == `all`:
+			// If `all` is specified as a group, set the list of all hosts that aren't
+			// already in the list
+			for _, host := range inv.AllHosts() {
+				if _, found := hosts[host]; !found {
+					hosts[host] = []string{}
+				}
+			}
+		case !inv.HasGroup(group):
+			// Skip silently if the group doesn't exist
+			continue
+		default:
+			// If the group does exist, get its list of hosts and go over each
+			for _, host := range inv.GroupHosts(group) {
+				if _, found := hosts[host]; found {
+					// If the host already exists, add the group to its list
+					hosts[host] = append(hosts[host], group)
+				} else {
+					// otherwise, create a new host entry
+					hosts[host] = []string{group}
+				}
+			}
+		}
+	}
+
+	return hosts
+}
+
+func (inv *ClusterInventory) AllHosts() []string {
+	hosts := make([]string, len(inv.All.Hosts))
+	i := 0
+	for host := range inv.All.Hosts {
+		hosts[i] = host
+	}
+
+	return hosts
+}
+
+func (inv *ClusterInventory) GroupHosts(group string) []string {
+	var hosts []string
+	if inv.HasGroup(group) {
+		hosts = inv.All.Groups[group].HostNames()
+	}
+	return hosts
+}
+
 func (inv *ClusterInventory) toYaml() ([]byte, error) {
 	yamlOut, err := yaml.Marshal(inv)
 	if err != nil {
@@ -199,6 +271,62 @@ func (inv *ClusterInventory) fromYaml(yamlData []byte) error {
 	return nil
 }
 
+func (invHosts InventoryHosts) HostNames() []string {
+	hosts := make([]string, len(invHosts.Hosts))
+	i := 0
+	for host := range invHosts.Hosts {
+		hosts[i] = host
+	}
+	return hosts
+}
+
+func WriteYamlInventoryToDir(cluster *Cluster, dir string) error {
+	path := filepath.Clean(dir)
+
+	if !filepath.IsAbs(dir) {
+		var err error
+		if path, err = filepath.Abs(dir); err != nil {
+			return fmt.Errorf("Could not derive the absolute path for %q: %v", dir, err)
+		}
+	}
+
+	stat, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("Unable to access %q: %v", path, err)
+	}
+
+	mode := stat.Mode()
+	if !mode.IsDir() {
+		return fmt.Errorf("%q is not a directory.", path)
+	}
+
+	if err := unix.Access(path, unix.W_OK); err != nil {
+		return fmt.Errorf("Directory %q is not writable: %v", dir, err)
+	}
+
+	path = filepath.Join(path, cluster.Name, `.yml`)
+
+	yaml, err := cluster.Inventory.toYaml()
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(path, yaml, 0644); err != nil {
+		return fmt.Errorf("Unable to write yaml file %q: %v", path, err)
+	}
+
+	return nil
+}
+
 func inventoryFileRelPath(name string) string {
 	return inventoryDir + fmt.Sprintf("%s.yml", name)
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
