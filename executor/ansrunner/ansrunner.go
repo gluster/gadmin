@@ -33,22 +33,37 @@ func init() {
 	runnerExePath = path
 }
 
+// This is the type to be worked with to run a playbook via ansible-runner. It
+// is possible to run multiple playbooks via the same instance of AnsRunner.
 type AnsRunner struct {
 	BaseDir       string
 	cluster       *inventory.Cluster
 	Exe           string
-	Invocation    *exec.Cmd
 	hosts         []string
 	overrideHosts bool
-	args          AnsRunnerArgs
+	Invocation    AnsRunnerInvocation
 }
 
-type AnsRunnerArgs struct {
-	Playbook string
+// The AnsRunnerArgs get setup internally by New() and
+// AnsRunner.AddPlaybook(). The interface is provided to enable test cases to
+// modify the arguments for multiple runs using the same AnsRunner instance,
+// without having to do the setup and teardown each time. In actual code, this
+// type shouldn't need to be used directly unless to log the details for
+// debugging.
+type AnsRunnerInvocation struct {
 	Ident    string
+	Playbook string
+	Cmd      *exec.Cmd
+	Setup    bool
 }
 
-func New(baseDir string, cluster *inventory.Cluster, id string) (*AnsRunner, error) {
+// First create a new instance using New(). The BaseDir is the directory under
+// which the ansible-runner directory structure is expected to exit. This is
+// also the directory to which the output artifacts will be written. cluster
+// being a pointer, allows the inventory to be refreshed and the runner to be
+// run against the refreshed inventory.
+func New(baseDir string, cluster *inventory.Cluster) (*AnsRunner,
+	error) {
 	path, err := getAbsPath(baseDir)
 	if err != nil {
 		return nil, err
@@ -58,18 +73,33 @@ func New(baseDir string, cluster *inventory.Cluster, id string) (*AnsRunner, err
 	runner.BaseDir = path
 	runner.cluster = cluster
 	runner.Exe = runnerExePath
-	runner.args.Ident = id
 	return &runner, nil
 }
 
 func (ans *AnsRunner) Execute() error {
-	err := ans.Invocation.Run()
+	// TODO: Don't need to throw out internal errors from the likes of ans.run()
+	// to the user of this type. Might be better to setup proper error types.
+	err := ans.run()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
+// Private method to check whether the invocation has been setup before
+// running the command. No need to expose the invocation details to the user
+// of this type.
+func (ans *AnsRunner) run() error {
+	if !ans.Invocation.Setup {
+		return errors.New("Invocation not setup. Call *AnsRunner.SetupInvocation() first.")
+	}
+	return ans.Invocation.Cmd.Run()
+}
+
+// Call this *only to* override the execution of a playbook against a specific set of
+// hosts. This will setup a list of hosts or all the hosts from a target group
+// to run the play against by specifying them directly on the command line to
+// ansible-runner.
 func (ans *AnsRunner) SetTarget(targettype string, targets []string) error {
 	if len(targets) == 0 {
 		return errors.New("No targets provided.")
@@ -119,6 +149,10 @@ func (ans *AnsRunner) setHostsFromGroups(groups []string) error {
 	return nil
 }
 
+// This will create the top level base directory in which all ansible-runner
+// input and output will reside. This is required only once before the first
+// invocation of an AnsRunner instance. Every invocation will use the same
+// directory thereafter.
 func (ans *AnsRunner) CreateBaseDir() error {
 	if err := os.Mkdir(ans.BaseDir, 0755); err != nil {
 		return fmt.Errorf("Unable to create the runner base directory %q: %v", ans.BaseDir, err)
@@ -127,6 +161,9 @@ func (ans *AnsRunner) CreateBaseDir() error {
 	return nil
 }
 
+// If the base directory has already been created, call to create the input
+// directories inside it. As with CreateBaseDir(), only requires to be called
+// once before the first invocation of an AnsRunner instance.
 func (ans *AnsRunner) SetupInputDirs() error {
 	path := ans.BaseDir
 
@@ -144,33 +181,49 @@ func (ans *AnsRunner) SetupInputDirs() error {
 	return nil
 }
 
-func (ans *AnsRunner) AddPlaybookFile(file string) error {
-	src, err := getAbsPath(filepath.Clean(file))
+// Needs to be called to setup an invocation for a specific playbook to be
+// run. This means that it must be called at least once before
+// AnsRunner.Execute() can be called. Can be called multiple times to replace
+// the AnsRunner.Invocation value to run multiple plays against the same
+// runner base directory.
+func (ans *AnsRunner) SetupInvocation(ident string, playbookFile string) error {
+	playbook, err := ans.addPlaybookFile(playbookFile)
 	if err != nil {
-		return fmt.Errorf("Unable to get absolute path for the playbook source file %q: %v", file, err)
-	}
-	if err := ensureFileReadable(src); err != nil {
 		return err
 	}
 
-	invDir := filepath.Join(ans.BaseDir, `inventory`)
-	if err := ensureDirWritable(invDir); err != nil {
-		return err
-	}
+	cmd := exec.Command("ansible-runner", "-p", playbook, "-i", ident, "run", ans.BaseDir)
 
-	dst := filepath.Join(invDir, filepath.Base(file))
-
-	if err = copyFile(src, dst); err != nil {
-		return fmt.Errorf("Failed to copy playbook from %q to %q: %v", src, dst, err)
-	}
-
-	ans.args.Playbook = dst
+	ans.Invocation = AnsRunnerInvocation{ident, playbook, cmd, true}
 
 	return nil
 }
 
-func (ans *AnsRunner) SetupInvocation() {
-	ans.Invocation = exec.Command("ansible-runner", "-p", ans.args.Playbook, "-i", ans.args.Ident, "run", ans.BaseDir)
+// Copies a playbook file to the input directory.
+func (ans *AnsRunner) addPlaybookFile(file string) (string, error) {
+	var dst string
+
+	src, err := getAbsPath(filepath.Clean(file))
+	if err != nil {
+		return dst, fmt.Errorf("Unable to get absolute path for the playbook source file %q: %v", file, err)
+	}
+	// No need for readable check, os.Open() will fail in copyFile().
+	//If err := ensureFileReadable(src); err != nil {
+	//	return "", err
+	//}
+
+	invDir := filepath.Join(ans.BaseDir, `inventory`)
+	if err := ensureDirWritable(invDir); err != nil {
+		return dst, err
+	}
+
+	dst = filepath.Join(invDir, filepath.Base(file))
+
+	if err = copyFile(src, dst); err != nil {
+		return dst, fmt.Errorf("Failed to copy playbook from %q to %q: %v", src, dst, err)
+	}
+
+	return dst, nil
 }
 
 func getAbsPath(path string) (string, error) {
