@@ -62,6 +62,14 @@ func New(baseDir string, cluster *inventory.Cluster, id string) (*AnsRunner, err
 	return &runner, nil
 }
 
+func (ans *AnsRunner) Execute() error {
+	err := ans.Invocation.Run()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (ans *AnsRunner) SetTarget(targettype string, targets []string) error {
 	if len(targets) == 0 {
 		return errors.New("No targets provided.")
