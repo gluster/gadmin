@@ -17,11 +17,19 @@ var runnerInputDirs = []string{`inventory`, `project`}
 var runnerExePath string
 
 func init() {
+	// Check if ansible-runner is in $PATH and is executable.
 	path, err := exec.LookPath("ansible-runner")
+
 	if err != nil {
 		fmt.Println("ansible-runner not found in $PATH: %q", os.Getenv("PATH"))
 		os.Exit(253)
 	}
+
+	if err := ensureFileExecutable(path); err != nil {
+		fmt.Println(err)
+		os.Exit(253)
+	}
+
 	runnerExePath = path
 }
 
@@ -148,7 +156,13 @@ func (ans *AnsRunner) AddPlaybookFile(file string) error {
 		return fmt.Errorf("Failed to copy playbook from %q to %q: %v", src, dst, err)
 	}
 
+	ans.args.Playbook = dst
+
 	return nil
+}
+
+func (ans *AnsRunner) SetupInvocation() {
+	ans.Invocation = exec.Command("ansible-runner", "-p", ans.args.Playbook, "-i", ans.args.Ident, "run", ans.BaseDir)
 }
 
 func getAbsPath(path string) (string, error) {
@@ -217,6 +231,18 @@ func ensureFileReadable(path string) error {
 
 	if err := unix.Access(path, unix.R_OK); err != nil {
 		return fmt.Errorf("File %q is not readable.", path)
+	}
+
+	return nil
+}
+
+func ensureFileExecutable(path string) error {
+	if err := ensureFile(path); err != nil {
+		return err
+	}
+
+	if err := unix.Access(path, unix.X_OK); err != nil {
+		return fmt.Errorf("File %q is not executable.", path)
 	}
 
 	return nil
